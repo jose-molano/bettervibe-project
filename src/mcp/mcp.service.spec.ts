@@ -50,10 +50,12 @@ describe('MCPService', () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  it('registers all five tools on the server', () => {
+  it('registers all tools on the server', () => {
     const svc = new MCPService(makeSearch(tmp));
     const server = svc.buildServer();
     expect(Object.keys(tools(server)).sort()).toEqual([
+      'bills_due_this_week',
+      'extract_amounts',
       'get_transcript',
       'library_stats',
       'list_categories',
@@ -106,6 +108,67 @@ describe('MCPService', () => {
     const server = svc.buildServer();
     const result = await tools(server)['list_providers'].handler({});
     expect(JSON.parse(result.content[0].text)).toEqual(providers);
+  });
+
+  it('bills_due_this_week calls searchTranscripts with a 7-day window around today', async () => {
+    const hits = [{ path: 'p', frontMatter: { due_date: '2099-01-01' }, snippet: 's' }];
+    const search = makeSearch(tmp, { hits });
+    const svc = new MCPService(search);
+    const server = svc.buildServer();
+    const tool = tools(server)['bills_due_this_week'];
+
+    const result = await tool.handler({});
+    expect(JSON.parse(result.content[0].text)).toEqual(hits);
+    expect(search.searchTranscripts).toHaveBeenCalledTimes(1);
+    const args = (search.searchTranscripts as jest.Mock).mock.calls[0][0];
+    expect(args).toEqual({
+      dueAfter: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      dueBefore: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
+    const today = new Date().toISOString().slice(0, 10);
+    expect(args.dueAfter < today).toBe(true);
+    expect(args.dueBefore > today).toBe(true);
+  });
+
+  it('bills_due_this_week respects the days argument', async () => {
+    const search = makeSearch(tmp, { hits: [] });
+    const svc = new MCPService(search);
+    const server = svc.buildServer();
+    const tool = tools(server)['bills_due_this_week'];
+
+    await tool.handler({ days: 30 });
+    const args = (search.searchTranscripts as jest.Mock).mock.calls[0][0];
+    const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    const after = new Date(`${args.dueAfter}T00:00:00Z`);
+    const before = new Date(`${args.dueBefore}T00:00:00Z`);
+    const dayMs = 24 * 60 * 60 * 1000;
+    expect(Math.round((today.getTime() - after.getTime()) / dayMs)).toBe(1);
+    expect(Math.round((before.getTime() - today.getTime()) / dayMs)).toBe(31);
+  });
+
+  it('extract_amounts returns amounts parsed from a transcript under LIBRARY_PATH', async () => {
+    await writeFile(
+      join(tmp, '2024', 'utilities', 'a.md'),
+      '---\nprovider: Vattenfall\n---\nTotal due: €87,50 by next month. Late fee $5.',
+    );
+    const svc = new MCPService(makeSearch(tmp));
+    const server = svc.buildServer();
+    const tool = tools(server)['extract_amounts'];
+
+    const result = await tool.handler({ path: join(tmp, '2024', 'utilities', 'a.md') });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed).toEqual([
+      expect.objectContaining({ amount: '87,50', currency: '€' }),
+      expect.objectContaining({ amount: '5', currency: '$' }),
+    ]);
+  });
+
+  it('extract_amounts rejects paths outside LIBRARY_PATH', async () => {
+    const svc = new MCPService(makeSearch(tmp));
+    const server = svc.buildServer();
+    const tool = tools(server)['extract_amounts'];
+
+    await expect(tool.handler({ path: '/etc/passwd' })).rejects.toThrow(/outside LIBRARY_PATH/);
   });
 
   it('library_stats returns the full stats object as JSON', async () => {

@@ -52,6 +52,28 @@ const GET_INPUT = {
     .describe('Absolute path to a .md transcript inside the configured LIBRARY_PATH.'),
 };
 
+const BILLS_INPUT = {
+  days: z
+    .number()
+    .int()
+    .min(1)
+    .max(60)
+    .optional()
+    .describe('Window size in days from today (inclusive). Default 7.'),
+};
+
+const EXTRACT_AMOUNTS_INPUT = {
+  path: z
+    .string()
+    .describe('Absolute path to a .md transcript inside LIBRARY_PATH to scan for amounts.'),
+};
+
+function addDays(yyyymmdd: string, days: number): string {
+  const d = new Date(`${yyyymmdd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 @Injectable()
 export class MCPService {
   constructor(private readonly search: SearchService) {}
@@ -115,6 +137,43 @@ export class MCPService {
       async () => {
         const result = await this.search.getStats();
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    );
+
+    server.registerTool(
+      'bills_due_this_week',
+      {
+        title: 'Bills due in the next N days',
+        description:
+          "Return documents whose due_date falls within the next N days (inclusive of today). Defaults to 7 days. Use this for questions like 'what's due this week' or 'show me bills due soon'.",
+        inputSchema: BILLS_INPUT,
+      },
+      async (args) => {
+        const days = args.days ?? 7;
+        const today = new Date().toISOString().slice(0, 10);
+        const dueAfter = addDays(today, -1);
+        const dueBefore = addDays(today, days + 1);
+        const hits = await this.search.searchTranscripts({ dueAfter, dueBefore });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(hits, null, 2) }],
+        };
+      },
+    );
+
+    server.registerTool(
+      'extract_amounts',
+      {
+        title: 'Extract monetary amounts from a transcript',
+        description:
+          "Scan a transcript for monetary amounts (€, EUR, $, USD) and return each with the surrounding text. Use this when the user asks 'how much was X' or 'find the total in this document'.",
+        inputSchema: EXTRACT_AMOUNTS_INPUT,
+      },
+      async ({ path }) => {
+        const content = await this.readTranscript(path);
+        const amounts = SearchService.extractAmounts(content);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(amounts, null, 2) }],
+        };
       },
     );
 

@@ -48,6 +48,12 @@ export interface LibraryStats {
   upcoming_due_dates: UpcomingDueDate[];
 }
 
+export interface AmountHit {
+  amount: string;
+  currency: string;
+  context: string;
+}
+
 const UPCOMING_DUE_LIMIT = 5;
 
 const DEFAULT_LIMIT = 20;
@@ -203,6 +209,25 @@ export class SearchService {
       const { frontMatter } = parseFrontMatter(raw);
       yield { path, frontMatter };
     }
+  }
+
+  static extractAmounts(text: string): AmountHit[] {
+    const re = /(€|EUR|USD|\$)\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(€|EUR|USD|\$)/gi;
+    const out: AmountHit[] = [];
+    const seen = new Set<string>();
+    for (const m of text.matchAll(re)) {
+      const currencyRaw = (m[1] ?? m[4] ?? '').toUpperCase();
+      const amount = m[2] ?? m[3] ?? '';
+      const currency = currencyRaw === 'EUR' ? '€' : currencyRaw === 'USD' ? '$' : currencyRaw;
+      const key = `${currency}|${amount}|${m.index}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const start = Math.max(0, (m.index ?? 0) - 40);
+      const end = Math.min(text.length, (m.index ?? 0) + m[0].length + 40);
+      const context = text.slice(start, end).replace(/\s+/g, ' ').trim();
+      out.push({ amount, currency, context });
+    }
+    return out;
   }
 
   libraryPath(): string {

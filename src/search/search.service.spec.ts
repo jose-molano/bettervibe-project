@@ -234,6 +234,18 @@ describe('SearchService', () => {
       void today;
     });
 
+    it('extractAmounts picks up €, EUR, $, USD in pre- or postfix position', () => {
+      const text = 'Total €87,50 due. Late fee 5 USD. Old invoice $199.99. Refund: EUR 12.';
+      const out = SearchService.extractAmounts(text);
+      expect(out.map((h) => `${h.currency}${h.amount}`)).toEqual([
+        '€87,50',
+        '$5',
+        '$199.99',
+        '€12',
+      ]);
+      expect(out[0].context).toMatch(/Total/);
+    });
+
     it('caps upcoming_due_dates at 5', async () => {
       for (let i = 1; i <= 7; i++) {
         await dropTranscript(

@@ -8,6 +8,7 @@ import { LibraryModule } from './library/library.module';
 import { LogModule } from './log/log.module';
 import { MCPModule } from './mcp/mcp.module';
 import { SearchModule } from './search/search.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SearchModule } from './search/search.module';
     ClassifyModule,
     AgentModule,
     MCPModule,
+    TelegramModule,
   ],
 })
 export class AppModule {}

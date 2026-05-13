@@ -8,5 +8,6 @@ import { AgentCommand } from './agent.command';
 @Module({
   imports: [AnthropicModule, LibraryModule, SearchModule],
   providers: [AgentService, AgentCommand],
+  exports: [AgentService],
 })
 export class AgentModule {}
