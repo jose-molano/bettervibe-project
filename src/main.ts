@@ -3,7 +3,11 @@ import { CommandFactory } from 'nest-commander';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  await CommandFactory.run(AppModule, { logger: ['error', 'warn', 'log'] });
+  // MCP speaks JSON-RPC over stdout; any NestJS log to stdout would corrupt it.
+  const isMcp = process.argv.includes('mcp');
+  await CommandFactory.run(AppModule, {
+    logger: isMcp ? false : ['error', 'warn', 'log'],
+  });
 }
 
 bootstrap();

@@ -1,4 +1,5 @@
 import { Command, CommandRunner } from 'nest-commander';
+import { AgentService } from './agent.service';
 
 @Command({
   name: 'ask',
@@ -7,7 +8,17 @@ import { Command, CommandRunner } from 'nest-commander';
   argsDescription: { question: 'The question to answer using your library' },
 })
 export class AgentCommand extends CommandRunner {
-  async run(_passedParam: string[]): Promise<void> {
-    throw new Error('Not implemented');
+  constructor(private readonly agent: AgentService) {
+    super();
+  }
+
+  async run(passedParams: string[]): Promise<void> {
+    const question = passedParams.join(' ').trim();
+    if (!question) {
+      console.error('Usage: paperclaw ask "<question>"');
+      process.exitCode = 1;
+      return;
+    }
+    await this.agent.ask(question);
   }
 }

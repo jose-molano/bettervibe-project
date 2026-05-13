@@ -38,6 +38,7 @@ followed by the full extracted text:
 original_filename: electricity-bill-sept.pdf
 category: utilities
 date: 2024-09-01
+due_date: 2024-10-15
 provider: Vattenfall
 summary: Electricity bill for September 2024, €87.50, due 2024-10-15
 confidence: high
@@ -48,6 +49,11 @@ classified_at: 2024-10-01T10:00:00Z
 
 [full extracted text]
 ```
+
+`due_date` is the explicit payment/expiration date when the document states
+one (bills, invoices). Empty string for documents that don't have one
+(contracts, statements, receipts). The structured search filters (`dueBefore`,
+`dueAfter`) rely on it.
 
 ### Categories
 
@@ -109,10 +115,17 @@ paperclaw/
 │   ├── library/
 │   │   ├── library.module.ts
 │   │   └── library.service.ts     # movePdf(), writeTranscript(), listTranscripts()
-│   └── agent/
-│       ├── agent.module.ts
-│       ├── agent.service.ts       # ask(question, transcripts[]): Promise<string>
-│       └── agent.command.ts       # @Command({ name: 'ask' })
+│   ├── agent/
+│   │   ├── agent.module.ts
+│   │   ├── agent.service.ts       # ask(question): streams answer from Claude
+│   │   └── agent.command.ts       # @Command({ name: 'ask' })
+│   ├── search/
+│   │   ├── search.module.ts
+│   │   └── search.service.ts      # searchTranscripts(filters): SearchHit[]
+│   └── mcp/
+│       ├── mcp.module.ts
+│       ├── mcp.service.ts         # registers search_transcripts + get_transcript
+│       └── mcp.command.ts         # @Command({ name: 'mcp' }) — stdio server
 ├── inbox/                         # Drop PDFs here (.gitkeep; real PDFs gitignored)
 │   └── done/                      # Processed PDFs moved here (never deleted)
 ├── library/                       # Organized output (.gitkeep; contents gitignored)
@@ -129,10 +142,14 @@ paperclaw/
 ```
 AppModule
   ├── ConfigModule (global)
+  ├── AnthropicModule
   ├── ExtractModule
-  ├── ClassifyModule  →  ExtractModule
   ├── LibraryModule
-  └── AgentModule     →  LibraryModule
+  ├── LogModule
+  ├── SearchModule    →  LibraryModule
+  ├── ClassifyModule  →  ExtractModule, AnthropicModule, LibraryModule
+  ├── AgentModule     →  SearchModule, AnthropicModule
+  └── MCPModule       →  SearchModule, LibraryModule
 ```
 
 ### Data Flow: `classify`
@@ -149,9 +166,17 @@ AppModule
 
 ### Data Flow: `ask`
 
-1. `LibraryService.listTranscripts()` — glob all `*.md` files in `library/`
-2. **Pre-filter** — extract keywords and date hints from the question; discard transcripts whose front-matter and content have no overlap with those keywords. This keeps the Claude context small even with large libraries.
-3. `AgentService.ask()` — send filtered transcripts + question to Claude, stream answer to stdout
+1. `SearchService.searchTranscripts({ text: question })` — best-effort substring pre-filter against summary + body. If it returns fewer than 3 hits, fall back to listing all transcripts (capped by total character budget).
+2. `AgentService.ask()` — load full transcript contents (up to 80k chars total), send them + the question + today's date to Claude, stream the answer to stdout. The system prompt instructs the model to cite source paths and refuse to invent facts.
+
+### Data Flow: `mcp`
+
+1. `paperclaw mcp` boots the NestJS context with the logger disabled (stdout is reserved for MCP JSON-RPC).
+2. `MCPService.start()` constructs an `McpServer`, registers two tools, and connects a `StdioServerTransport`.
+3. Agents call the tools:
+   - `search_transcripts(filters)` → returns matching hits (`path`, `frontMatter`, `snippet`) as JSON text.
+   - `get_transcript({ path })` → returns the full markdown. The path is validated against `LIBRARY_PATH` to prevent traversal.
+4. The agent composes its own answer; PaperClaw does not call Claude in this flow.
 
 ### Limitations
 

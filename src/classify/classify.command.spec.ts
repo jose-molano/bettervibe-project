@@ -55,6 +55,7 @@ describe('ClassifyCommand', () => {
     classify.classifyDocument.mockResolvedValue({
       category: 'utilities',
       date: '2024-09-01',
+      due_date: '2024-10-15',
       provider: 'Vattenfall',
       summary: 'Electricity bill Sept 2024',
       filename: 'electricity-bill',
@@ -69,6 +70,7 @@ describe('ClassifyCommand', () => {
     const transcript = await readFile(md, 'utf8');
     expect(transcript).toContain('category: utilities');
     expect(transcript).toContain('provider: Vattenfall');
+    expect(transcript).toContain('due_date: 2024-10-15');
     // archived
     expect(await readFile(join(inbox, 'done', 'bill.pdf'), 'utf8')).toBe('pretend-pdf');
     expect(log.event).toHaveBeenCalledWith(
@@ -84,6 +86,7 @@ describe('ClassifyCommand', () => {
     classify.classifyDocument.mockResolvedValue({
       category: 'utilities',
       date: '2020-01-01',
+      due_date: '',
       provider: '',
       summary: 'unsure',
       filename: 'mystery',
@@ -142,6 +145,7 @@ describe('ClassifyCommand', () => {
     classify.classifyDocument.mockResolvedValue({
       category: 'unsorted',
       date: '2024-03-15',
+      due_date: '',
       provider: '',
       summary: 'no clear category',
       filename: 'thing',

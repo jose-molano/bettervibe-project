@@ -61,6 +61,27 @@ describe('LibraryService', () => {
     await expect(stat(src)).rejects.toThrow();
   });
 
+  it('listTranscripts returns all .md files under the library, sorted', async () => {
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(join(tmp, '2024', 'utilities'), { recursive: true });
+    await mkdir(join(tmp, '2025', 'banking'), { recursive: true });
+    await writeFile(join(tmp, '2024', 'utilities', 'a.md'), '');
+    await writeFile(join(tmp, '2024', 'utilities', 'a.pdf'), '');
+    await writeFile(join(tmp, '2025', 'banking', 'b.md'), '');
+    await writeFile(join(tmp, '2025', 'banking', 'ignored.txt'), '');
+
+    const results = await service.listTranscripts(tmp);
+    expect(results).toEqual([
+      join(tmp, '2024', 'utilities', 'a.md'),
+      join(tmp, '2025', 'banking', 'b.md'),
+    ]);
+  });
+
+  it('listTranscripts returns empty array if library does not exist', async () => {
+    const results = await service.listTranscripts(join(tmp, 'does-not-exist'));
+    expect(results).toEqual([]);
+  });
+
   it('archiveOriginal resolves basename collisions', async () => {
     const { mkdir } = await import('node:fs/promises');
     const dir1 = join(tmp, 'a');

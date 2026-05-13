@@ -6,6 +6,7 @@ import { CATEGORIES, Category } from './categories';
 export interface ClassifyResult {
   category: Category;
   date: string;
+  due_date: string;
   provider: string;
   summary: string;
   filename: string;
@@ -20,6 +21,7 @@ const SYSTEM_PROMPT = `You classify personal documents (bills, contracts, statem
 For each document call the tool "classify_document" exactly once with your best guess of:
 - category: one of ${CATEGORIES.join(', ')}. Pick "unsorted" only if no other category clearly applies.
 - date: the most relevant date on the document in YYYY-MM-DD format (issue date for bills/invoices, signing date for contracts). If only month/year are visible, use the first day of that month.
+- due_date: the payment due / expiration date in YYYY-MM-DD format if the document explicitly states one (bills, invoices). Empty string when the document has no due date (contracts, statements, receipts).
 - provider: the issuing entity (e.g. "Vattenfall", "Banco Santander"). Empty string if not identifiable.
 - summary: one sentence (<= 200 chars) describing the document.
 - filename: a short kebab-case slug (no extension, no dates) — e.g. "electricity-bill", "lease-agreement-apartment-4b".
@@ -45,12 +47,21 @@ export class ClassifyService {
             properties: {
               category: { type: 'string', enum: [...CATEGORIES] },
               date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+              due_date: { type: 'string', pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
               provider: { type: 'string' },
               summary: { type: 'string', maxLength: 200 },
               filename: { type: 'string', pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' },
               confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
             },
-            required: ['category', 'date', 'provider', 'summary', 'filename', 'confidence'],
+            required: [
+              'category',
+              'date',
+              'due_date',
+              'provider',
+              'summary',
+              'filename',
+              'confidence',
+            ],
           },
         },
       ],

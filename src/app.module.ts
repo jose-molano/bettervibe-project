@@ -6,6 +6,8 @@ import { AppConfigModule } from './config/config.module';
 import { ExtractModule } from './extract/extract.module';
 import { LibraryModule } from './library/library.module';
 import { LogModule } from './log/log.module';
+import { MCPModule } from './mcp/mcp.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -14,8 +16,10 @@ import { LogModule } from './log/log.module';
     ExtractModule,
     LibraryModule,
     LogModule,
+    SearchModule,
     ClassifyModule,
     AgentModule,
+    MCPModule,
   ],
 })
 export class AppModule {}

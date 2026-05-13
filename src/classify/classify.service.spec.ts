@@ -15,6 +15,7 @@ describe('ClassifyService', () => {
           input: {
             category: 'utilities',
             date: '2024-09-01',
+            due_date: '2024-10-15',
             provider: 'Vattenfall',
             summary: 'Electricity bill Sept 2024',
             filename: 'electricity-bill',
@@ -30,6 +31,7 @@ describe('ClassifyService', () => {
     expect(result).toEqual({
       category: 'utilities',
       date: '2024-09-01',
+      due_date: '2024-10-15',
       provider: 'Vattenfall',
       summary: 'Electricity bill Sept 2024',
       filename: 'electricity-bill',
@@ -59,6 +61,7 @@ describe('ClassifyService', () => {
           input: {
             category: 'unsorted',
             date: '2024-01-01',
+            due_date: '',
             provider: '',
             summary: 'x',
             filename: 'x',

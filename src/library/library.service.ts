@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { copyFile, mkdir, rename, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, rename, stat, writeFile } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 
 @Injectable()
@@ -26,9 +27,28 @@ export class LibraryService {
     return finalPath;
   }
 
-  // M3: implement when adding `ask` command.
-  async listTranscripts(_libraryPath: string): Promise<string[]> {
-    throw new Error('listTranscripts is not implemented yet (M3)');
+  async listTranscripts(libraryPath: string): Promise<string[]> {
+    const found: string[] = [];
+    await this.walk(libraryPath, found);
+    return found.sort();
+  }
+
+  private async walk(dir: string, acc: string[]): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const name = String(entry.name);
+      const full = join(dir, name);
+      if (entry.isDirectory()) {
+        await this.walk(full, acc);
+      } else if (entry.isFile() && name.toLowerCase().endsWith('.md')) {
+        acc.push(full);
+      }
+    }
   }
 
   private async resolveCollision(path: string): Promise<string> {

@@ -87,6 +87,7 @@ export class ClassifyCommand extends CommandRunner {
             original_filename: basename(file),
             category,
             date: result.date,
+            due_date: result.due_date,
             provider: result.provider,
             summary: result.summary,
             confidence: result.confidence,
