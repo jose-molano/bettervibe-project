@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
+import { AnthropicModule } from '../anthropic/anthropic.module';
 import { ExtractModule } from '../extract/extract.module';
-import { ClassifyService } from './classify.service';
+import { LibraryModule } from '../library/library.module';
+import { LogModule } from '../log/log.module';
 import { ClassifyCommand } from './classify.command';
+import { ClassifyService } from './classify.service';
 
 @Module({
-  imports: [ExtractModule],
+  imports: [AnthropicModule, ExtractModule, LibraryModule, LogModule],
   providers: [ClassifyService, ClassifyCommand],
 })
 export class ClassifyModule {}

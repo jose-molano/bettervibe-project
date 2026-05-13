@@ -40,6 +40,7 @@ category: utilities
 date: 2024-09-01
 provider: Vattenfall
 summary: Electricity bill for September 2024, €87.50, due 2024-10-15
+confidence: high
 classified_at: 2024-10-01T10:00:00Z
 ---
 
@@ -47,6 +48,28 @@ classified_at: 2024-10-01T10:00:00Z
 
 [full extracted text]
 ```
+
+### Categories
+
+The classifier picks from a closed list. This keeps the directory tree
+predictable and prevents Claude from inventing one-off categories:
+
+```
+utilities, banking, insurance, taxes, medical, contracts,
+receipts, government, unsorted
+```
+
+The classifier also returns a `confidence` field (`high | medium | low`).
+Low confidence — or an explicit `unsorted` category — triggers the
+uncertainty path (see §Data Flow: `classify`).
+
+### Logging
+
+Every PDF processed by `classify` produces one or more entries in
+`library/processing.log` (append-only JSON Lines) and an equivalent
+line to stdout via the NestJS logger. Event types: `start`, `processed`,
+`skipped`, `error`. The log is intentionally human-grep-friendly and
+machine-parseable.
 
 ---
 
@@ -116,11 +139,13 @@ AppModule
 
 1. Scan `inbox/` for `*.pdf` files
 2. `ExtractService.extractText()` — pdf-parse returns raw string
-3. If extracted text is empty or very short (< 100 chars): warn the user and skip the file — the PDF is likely scanned/image-based and cannot be processed without OCR (see Limitations)
-4. `ClassifyService.classifyDocument()` — Claude returns `{ category, date, provider, summary, filename }`
-5. `LibraryService.movePdf()` — copy to `library/YYYY/category/filename.pdf` (YYYY = document date, not classification date)
-6. `LibraryService.writeTranscript()` — write front-matter + text to `filename.md`
-7. Move original from `inbox/` to `inbox/done/` (never deleted — pipeline is recoverable)
+3. If extracted text is empty or very short (< 100 chars): warn the user and skip the file — the PDF is likely scanned/image-based and cannot be processed without OCR (see Limitations). The PDF stays in `inbox/` so the user can intervene.
+4. `ClassifyService.classifyDocument()` — Claude returns `{ category, date, provider, summary, filename, confidence }` via a forced tool-use call (structured output, no parsing of free-form JSON).
+5. **Uncertainty path** — if `confidence === 'low'` or `category === 'unsorted'`, override the destination to `library/{thisYear}/unsorted/{today}-{slug(originalName)}.pdf` so the document is preserved but visibly flagged for human review.
+6. `LibraryService.movePdf()` — copy to `library/YYYY/category/filename.pdf` (YYYY = document date, not classification date). On filename collision, append a numeric suffix (`-2.pdf`, `-3.pdf`, ...).
+7. `LibraryService.writeTranscript()` — write front-matter + text to `filename.md` (same suffix as the PDF).
+8. Move original from `inbox/` to `inbox/done/` (never deleted — pipeline is recoverable).
+9. Append a `processed` event to `library/processing.log` (JSONL) and stdout.
 
 ### Data Flow: `ask`
 

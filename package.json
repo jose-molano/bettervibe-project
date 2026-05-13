@@ -2,6 +2,9 @@
   "name": "paperclaw",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "paperclaw": "dist/main.js"
+  },
   "scripts": {
     "build": "nest build",
     "start": "nest start",
