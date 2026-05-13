@@ -13,8 +13,11 @@ Two commands:
   built-in search) and asks Claude to answer in plain language (e.g. *"Which
   bills are overdue?"*).
 - **`paperclaw mcp`** — runs as an [MCP](https://modelcontextprotocol.io/)
-  stdio server, exposing two tools (`search_transcripts`, `get_transcript`) so
-  an agent (e.g. Claude Code) can drive the library directly.
+  stdio server, exposing tools (`search_transcripts`, `get_transcript`,
+  `bills_due_this_week`, `extract_amounts`, plus the discovery tools) so an
+  agent (e.g. Claude Code) can drive the library directly.
+- **`paperclaw telegram`** — runs as a Telegram bot. Forwards every text
+  message it receives to the `ask` agent and replies with the answer.
 
 See [DESIGN.md](DESIGN.md) for architecture, transcript format, categories,
 and limitations.
@@ -94,10 +97,27 @@ Tools exposed by the MCP server:
 | `list_providers` | _(none)_ | List unique providers with counts and most recent document date. |
 | `library_stats` | _(none)_ | Library summary: total docs, breakdown by category and year, next 5 upcoming due dates. |
 | `search_transcripts` | `category`, `provider`, `dateFrom`, `dateTo`, `dueBefore`, `dueAfter`, `text`, `limit` | Filter the library by YAML front-matter and/or text. Returns hits with metadata and a snippet. |
+| `bills_due_this_week` | `days` (optional, default 7) | Return documents whose `due_date` falls within the next N days from today (inclusive). |
+| `extract_amounts` | `path` (must be inside `LIBRARY_PATH`) | Scan a transcript for monetary amounts (€, EUR, $, USD) and return each with surrounding context. |
 | `get_transcript` | `path` (must be inside `LIBRARY_PATH`) | Return the full markdown transcript. |
 
 What could come next as MCP tools (not implemented): `classify_pdf`,
-`mark_paid`, `extract_amounts`, `summarize_year`, `find_duplicates`.
+`mark_paid`, `summarize_year`, `find_duplicates`.
+
+## Telegram bot
+
+`paperclaw telegram` exposes the `ask` agent over a Telegram chat. Create a
+bot via [@BotFather](https://t.me/BotFather), drop the token into `.env` as
+`TELEGRAM_BOT_TOKEN`, then:
+
+```bash
+npm run build
+node dist/main.js telegram
+```
+
+Any text message you send to the bot is forwarded to `AgentService.ask()` and
+the answer is sent back. Long answers are split across multiple messages to
+stay within Telegram's 4 KB limit. Stop with Ctrl+C.
 
 ## Development
 
@@ -116,3 +136,4 @@ npm run start:dev   # nest start --watch
 | `ANTHROPIC_API_KEY` | *(required)* | API key for Claude |
 | `INBOX_PATH` | `./inbox` | Folder scanned by `classify` |
 | `LIBRARY_PATH` | `./library` | Destination tree for organized documents |
+| `TELEGRAM_BOT_TOKEN` | *(optional)* | Required only for `paperclaw telegram`. Get one from @BotFather. |

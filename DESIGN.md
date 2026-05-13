@@ -16,6 +16,12 @@ document library. It has two commands:
   answers in plain language (e.g. "Which bills are overdue?", "Show me the
   latest electricity bill.").
 
+- **`paperclaw mcp`** — runs as an MCP stdio server so external agents (e.g.
+  Claude Code) can drive the library directly.
+
+- **`paperclaw telegram`** — runs as a Telegram bot. Forwards each incoming
+  text message to `AgentService.ask()` and replies with the streamed answer.
+
 Pipeline:
 
 ```
@@ -122,10 +128,14 @@ paperclaw/
 │   ├── search/
 │   │   ├── search.module.ts
 │   │   └── search.service.ts      # searchTranscripts(filters): SearchHit[]
-│   └── mcp/
-│       ├── mcp.module.ts
-│       ├── mcp.service.ts         # registers search_transcripts + get_transcript
-│       └── mcp.command.ts         # @Command({ name: 'mcp' }) — stdio server
+│   ├── mcp/
+│   │   ├── mcp.module.ts
+│   │   ├── mcp.service.ts         # registers search/discovery/bills_due_this_week/extract_amounts/get_transcript
+│   │   └── mcp.command.ts         # @Command({ name: 'mcp' }) — stdio server
+│   └── telegram/
+│       ├── telegram.module.ts
+│       ├── telegram.service.ts    # long-polls Telegram, forwards text to AgentService.ask()
+│       └── telegram.command.ts    # @Command({ name: 'telegram' })
 ├── inbox/                         # Drop PDFs here (.gitkeep; real PDFs gitignored)
 │   └── done/                      # Processed PDFs moved here (never deleted)
 ├── library/                       # Organized output (.gitkeep; contents gitignored)
@@ -149,7 +159,8 @@ AppModule
   ├── SearchModule    →  LibraryModule
   ├── ClassifyModule  →  ExtractModule, AnthropicModule, LibraryModule
   ├── AgentModule     →  SearchModule, AnthropicModule
-  └── MCPModule       →  SearchModule, LibraryModule
+  ├── MCPModule       →  SearchModule, LibraryModule
+  └── TelegramModule  →  AgentModule
 ```
 
 ### Data Flow: `classify`
@@ -180,8 +191,17 @@ AppModule
      - `library_stats` → `{ total_documents, by_category, by_year, upcoming_due_dates }` (upcoming = next 5 due dates from today onward).
    - **Search & fetch**:
      - `search_transcripts(filters)` → returns matching hits (`path`, `frontMatter`, `snippet`) as JSON text.
+     - `bills_due_this_week({ days? })` → thin wrapper that computes a `[today, today+N]` window (default N=7) and delegates to `search_transcripts` with `dueAfter` / `dueBefore`. Saves the agent from doing the date math.
+     - `extract_amounts({ path })` → reads the transcript (path validated against `LIBRARY_PATH`) and returns monetary amounts (`€`, `EUR`, `$`, `USD` in pre- or postfix position) with surrounding context. Pure regex; no LLM call.
      - `get_transcript({ path })` → returns the full markdown. The path is validated against `LIBRARY_PATH` to prevent traversal.
 4. The agent composes its own answer; PaperClaw does not call Claude in this flow.
+
+### Data Flow: `telegram`
+
+1. `paperclaw telegram` boots the NestJS context normally and calls `TelegramService.start()`.
+2. The service requires `TELEGRAM_BOT_TOKEN` in the environment and long-polls `getUpdates` against the Telegram Bot API using the built-in `fetch` (no SDK dependency).
+3. For each incoming text message, it invokes `AgentService.ask(text, sink)` with a buffering sink, then sends the accumulated answer back via `sendMessage`. Replies longer than ~4 KB are split into multiple messages to respect Telegram's limit.
+4. Transient `getUpdates` errors are logged and the loop retries after 2 s. The loop stops on `Ctrl+C`.
 
 ### Limitations
 
