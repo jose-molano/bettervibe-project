@@ -1,0 +1,21 @@
+# Build output
+/dist
+/.tsbuildinfo
+
+# Dependencies
+/node_modules
+
+# Environment variables — never commit secrets
+.env
+
+# Personal documents — never commit
+/inbox/*.pdf
+/inbox/done/
+/library/*
+!/library/.gitkeep
+
+# Coverage
+/coverage
+
+# macOS
+.DS_Store
