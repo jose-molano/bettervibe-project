@@ -115,4 +115,142 @@ describe('SearchService', () => {
     const hits = await service.searchTranscripts({ limit: 2 });
     expect(hits).toHaveLength(2);
   });
+
+  describe('listCategories', () => {
+    it('groups by category and sorts by count desc', async () => {
+      await dropTranscript(
+        '2024/utilities/a.md',
+        { category: 'utilities', date: '2024-09-01', due_date: '', provider: 'X' },
+        'x',
+      );
+      await dropTranscript(
+        '2024/utilities/b.md',
+        { category: 'utilities', date: '2024-09-01', due_date: '', provider: 'X' },
+        'x',
+      );
+      await dropTranscript(
+        '2024/banking/c.md',
+        { category: 'banking', date: '2024-09-01', due_date: '', provider: 'X' },
+        'x',
+      );
+
+      const result = await service.listCategories();
+      expect(result).toEqual([
+        { category: 'utilities', count: 2 },
+        { category: 'banking', count: 1 },
+      ]);
+    });
+
+    it('returns an empty array when library is empty', async () => {
+      expect(await service.listCategories()).toEqual([]);
+    });
+  });
+
+  describe('listProviders', () => {
+    it('groups by provider, ignores empty, tracks last_seen', async () => {
+      await dropTranscript(
+        '2024/utilities/a.md',
+        { category: 'utilities', date: '2024-09-01', due_date: '', provider: 'Vattenfall' },
+        'x',
+      );
+      await dropTranscript(
+        '2024/utilities/b.md',
+        { category: 'utilities', date: '2024-12-15', due_date: '', provider: 'Vattenfall' },
+        'x',
+      );
+      await dropTranscript(
+        '2024/banking/c.md',
+        { category: 'banking', date: '2024-08-01', due_date: '', provider: 'Santander' },
+        'x',
+      );
+      await dropTranscript(
+        '2024/contracts/d.md',
+        { category: 'contracts', date: '2024-01-01', due_date: '', provider: '' },
+        'x',
+      );
+
+      const result = await service.listProviders();
+      expect(result).toEqual([
+        { provider: 'Vattenfall', count: 2, last_seen: '2024-12-15' },
+        { provider: 'Santander', count: 1, last_seen: '2024-08-01' },
+      ]);
+    });
+  });
+
+  describe('getStats', () => {
+    it('returns zeros on empty library', async () => {
+      const stats = await service.getStats();
+      expect(stats).toEqual({
+        total_documents: 0,
+        by_category: {},
+        by_year: {},
+        upcoming_due_dates: [],
+      });
+    });
+
+    it('builds totals, by_category, by_year, and upcoming_due_dates', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const farFuture = '2999-12-31';
+      const farFuture2 = '2999-12-30';
+
+      await dropTranscript(
+        '2024/utilities/a.md',
+        {
+          category: 'utilities',
+          date: '2024-09-01',
+          due_date: farFuture,
+          provider: 'Vattenfall',
+        },
+        'x',
+      );
+      await dropTranscript(
+        '2025/utilities/b.md',
+        {
+          category: 'utilities',
+          date: '2025-02-10',
+          due_date: farFuture2,
+          provider: 'Vattenfall',
+        },
+        'x',
+      );
+      await dropTranscript(
+        '2024/banking/c.md',
+        { category: 'banking', date: '2024-08-01', due_date: '', provider: 'Santander' },
+        'x',
+      );
+      // overdue document — should NOT appear in upcoming
+      await dropTranscript(
+        '2024/utilities/d.md',
+        { category: 'utilities', date: '2020-01-01', due_date: '2020-01-15', provider: 'X' },
+        'x',
+      );
+
+      const stats = await service.getStats();
+      expect(stats.total_documents).toBe(4);
+      expect(stats.by_category).toEqual({ utilities: 3, banking: 1 });
+      expect(stats.by_year).toEqual({ '2024': 2, '2025': 1, '2020': 1 });
+      expect(stats.upcoming_due_dates.map((u) => u.due_date)).toEqual([farFuture2, farFuture]);
+      expect(stats.upcoming_due_dates[0].provider).toBe('Vattenfall');
+      void today;
+    });
+
+    it('caps upcoming_due_dates at 5', async () => {
+      for (let i = 1; i <= 7; i++) {
+        await dropTranscript(
+          `2099/utilities/${i}.md`,
+          {
+            category: 'utilities',
+            date: '2099-01-01',
+            due_date: `2099-0${i}-01`,
+            provider: 'X',
+          },
+          'x',
+        );
+      }
+      const stats = await service.getStats();
+      expect(stats.upcoming_due_dates).toHaveLength(5);
+      expect(stats.upcoming_due_dates[0].due_date).toBe('2099-01-01');
+      expect(stats.upcoming_due_dates[4].due_date).toBe('2099-05-01');
+    });
+  });
 });

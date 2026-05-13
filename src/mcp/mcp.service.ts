@@ -77,6 +77,48 @@ export class MCPService {
     );
 
     server.registerTool(
+      'list_categories',
+      {
+        title: 'List categories',
+        description:
+          'List the document categories present in the library with their counts. Call this before search_transcripts when you do not know which categories exist.',
+        inputSchema: {},
+      },
+      async () => {
+        const result = await this.search.listCategories();
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    );
+
+    server.registerTool(
+      'list_providers',
+      {
+        title: 'List providers',
+        description:
+          "List unique providers in the library with their document counts and the date of the most recent document from each. Useful for queries like 'show me everything from X'.",
+        inputSchema: {},
+      },
+      async () => {
+        const result = await this.search.listProviders();
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    );
+
+    server.registerTool(
+      'library_stats',
+      {
+        title: 'Library stats',
+        description:
+          'Return a summary of the library: total documents, breakdown by category and by year, and the next 5 upcoming due dates (excluding overdue).',
+        inputSchema: {},
+      },
+      async () => {
+        const result = await this.search.getStats();
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    );
+
+    server.registerTool(
       'get_transcript',
       {
         title: 'Get transcript',

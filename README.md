@@ -90,11 +90,14 @@ Tools exposed by the MCP server:
 
 | Tool | Input | Purpose |
 |---|---|---|
+| `list_categories` | _(none)_ | List the categories present in the library with their counts. Use before `search_transcripts` to know which filters make sense. |
+| `list_providers` | _(none)_ | List unique providers with counts and most recent document date. |
+| `library_stats` | _(none)_ | Library summary: total docs, breakdown by category and year, next 5 upcoming due dates. |
 | `search_transcripts` | `category`, `provider`, `dateFrom`, `dateTo`, `dueBefore`, `dueAfter`, `text`, `limit` | Filter the library by YAML front-matter and/or text. Returns hits with metadata and a snippet. |
 | `get_transcript` | `path` (must be inside `LIBRARY_PATH`) | Return the full markdown transcript. |
 
 What could come next as MCP tools (not implemented): `classify_pdf`,
-`mark_paid`, `extract_amounts`, `summarize_year`.
+`mark_paid`, `extract_amounts`, `summarize_year`, `find_duplicates`.
 
 ## Development
 

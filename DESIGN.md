@@ -174,8 +174,13 @@ AppModule
 1. `paperclaw mcp` boots the NestJS context with the logger disabled (stdout is reserved for MCP JSON-RPC).
 2. `MCPService.start()` constructs an `McpServer`, registers two tools, and connects a `StdioServerTransport`.
 3. Agents call the tools:
-   - `search_transcripts(filters)` → returns matching hits (`path`, `frontMatter`, `snippet`) as JSON text.
-   - `get_transcript({ path })` → returns the full markdown. The path is validated against `LIBRARY_PATH` to prevent traversal.
+   - **Discovery (read-only, no arguments)**:
+     - `list_categories` → `[{ category, count }]` sorted by count desc.
+     - `list_providers` → `[{ provider, count, last_seen }]` sorted by count desc.
+     - `library_stats` → `{ total_documents, by_category, by_year, upcoming_due_dates }` (upcoming = next 5 due dates from today onward).
+   - **Search & fetch**:
+     - `search_transcripts(filters)` → returns matching hits (`path`, `frontMatter`, `snippet`) as JSON text.
+     - `get_transcript({ path })` → returns the full markdown. The path is validated against `LIBRARY_PATH` to prevent traversal.
 4. The agent composes its own answer; PaperClaw does not call Claude in this flow.
 
 ### Limitations
